@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+
+<title>HoopLive — Display</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+
+<style>     
+/* 10อันดับคนที่ตกแต่งนานที่สุด */
+      /*ขุดสีพื้นฐาน*/
+  :root{--bgA:#fff; --textA:#111; --panelA:#f7f7f7; --accentA:#ff4d4d;/* แดง */ --accentB:#1e88e5;}/* น้ำเงิน*/
+  
+  body{margin:0;height:100vh;font-family:Orbitron,system-ui,Segoe UI,Roboto,Arial;color:#fff;background:#000}
+  
+  /* Layout */
+  .wrap{display:flex;height:100vh;align-items:center;justify-content:space-between;padding:24px}
+  /*  panel  */
+  .panel{width:36%;padding:28px;border
+  -radius:18px;background:linear-gradient(180deg,#06060a,#0b0f14);box-shadow:0 30px 60px rgba(0,0,0,.6)}
+  
+  .teamA{border:6px solid var(--accentA)}
+  .teamB{border:6px solid var(--accentB)}
+  
+  .name{font-size:28px;color:#cfe8ff}
+  
+  .score{font-size:140px;margin:8px 0;color:#ff4d4d}
+  .scoreB{color:#1e88e5}
+  
+  /* ตรงกลาง */
+  .center{text-align:center}
+  .timer{font-size:84px;color:#00ffd0;margin-bottom:6px}
+  .shot{font-size:28px;color:#ffb86b}
+  .meta{color:#9fb0d0;margin-top:8px}
+  .themeBtns{position:fixed;left:10px;top:10px;}
+  /* ปุ่มเปลี่ยนธีม */
+  .themeBtns button{margin-right:6px;padding:6px 10px;border-radius:6px;border:0;cursor:pointer}
+  
+  /* ป๊อปอัพคะแนน */
+  .pop{position:fixed;font-size:44px;font-weight:700;color:#fff;animation:popUp 900ms forwards;pointer-events:none}
+  @keyframes popUp{0%{transform:translateY(0) scale(1);opacity:1}30%{transform:translateY(-40px) scale(1.1);opacity:1}100%{transform:translateY(-120px) scale(.9);opacity:0}}
+  /* ขนาดจอ */
+  @media(max-width:900px){ .score{font-size:96px}.timer{font-size:48px} }
+</style>
+
+
+</head>
+
+<body>   <!-- ปุ่มเปลี่ยนธีม -->
+  <div class="themeBtns">
+    <button onclick="setTheme('A')">Theme A </button>
+    <button onclick="setTheme('B')">Theme B </button>
+    <button onclick="reloadOnce()">Reload</button>
+  </div>
+      
+      
+      <!-- Layout_score-->
+  <div class="wrap">
+    <!-- HOME -->
+    <div class="panel teamA">
+      <div class="name" id="nameA">HOME</div>
+      <div id="scoreA" class="score">0</div>
+      <div id="metaA" class="meta">F:0 • TO:3</div>
+    </div>
+        <!-- Middle -->
+    <div class="center">
+      <div id="timer" class="timer">10:00</div>
+      <div id="period" class="meta">Q1</div>
+      <div id="shot" class="shot">shot 24s</div>
+    </div>
+
+        <!-- Guest -->
+    <div class="panel teamB">
+      <div class="name" id="nameB">GUEST</div>
+      <div id="scoreB" class="score scoreB">0</div>
+      <div id="metaB" class="meta">F:0 • TO:3</div>
+    </div>
+  </div>
+
+<!-- Firebase config_จ้า -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDAeKv-cemaxAtrwUVtDOHLFLPV9maK-qw",
+  authDomain: "hooplive-9c413.firebaseapp.com",
+  databaseURL: "https://hooplive-9c413-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "hooplive-9c413",
+  storageBucket: "hooplive-9c413.firebasestorage.app",
+  messagingSenderId: "640934960664",
+  appId: "1:640934960664:web:be7a84c3894aa1c90fed6d",
+  measurementId: "G-ENY1Q023Y7"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const gameRef = ref(db, 'game');
+
+let prev = { scoreA:0, scoreB:0, shotLeft:24, secondsLeft:600 };
+
+
+      //pop up position
+function showPop(text, sideEl){
+  const el = document.createElement('div');
+  el.className = 'pop';
+  el.textContent = text;
+  document.body.appendChild(el);
+  const rect = sideEl.getBoundingClientRect();
+  el.style.left = (rect.left + rect.width/2 - 30) + 'px';
+  el.style.top = (rect.top + 10) + 'px';
+  //ลบpop_up หลังจาก1วิ
+  setTimeout(()=> el.remove(), 1000);
+}
+
+onValue(gameRef, snap=>{
+  const d = snap.val();
+  if(!d) return; 
+
+//ชื่อทีม
+  document.getElementById('nameA').textContent = d.teamAName || 'HOME';
+  document.getElementById('nameB').textContent = d.teamBName || 'GUEST';
+
+//ตรวจเช็คคะแนนข
+  const sA = d.scoreA || 0, sB = d.scoreB || 0;
+  if(sA > (prev.scoreA||0)) showPop('+' + (sA - (prev.scoreA||0)), document.getElementById('scoreA'));
+  if(sB > (prev.scoreB||0)) showPop('+' + (sB - (prev.scoreB||0)), document.getElementById('scoreB'));
+  document.getElementById('scoreA').textContent = sA;
+  document.getElementById('scoreB').textContent = sB;
+
+//แสดงฟาว+เทินโอเว่อ
+  document.getElementById('metaA').textContent = `F:${d.foulA||0} • TO:${d.toA||3}`;
+  document.getElementById('metaB').textContent = `F:${d.foulB||0} • TO:${d.toB||3}`;
+
+//นับเวลาหลัก
+  const sec = Math.max(0, Math.floor(d.secondsLeft||0));
+  const mm = Math.floor(sec/60), ss = sec%60;
+  document.getElementById('timer').textContent = `${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+  
+  document.getElementById('shot').textContent = 'shot ' + Math.max(0, Math.floor(d.shotLeft||0)) + 's';
+  //ควอเตอร์
+  document.getElementById('period').textContent = 'Q' + (d.period||1);
+
+  prev = { scoreA:sA, scoreB:sB, shotLeft:d.shotLeft||24, secondsLeft:sec };
+});
+
+//สีธีม
+function setTheme(which){
+  if(which==='A'){document.body.style.background = '#101011';
+document.querySelectorAll('.score').forEach(el=> el.style.color = '#faff00');
+document.querySelector('.teamA').style.borderColor = '#ff6fb5'; 
+document.querySelector('.teamB').style.borderColor = '#304ffe'; 
+
+  } else {
+    
+    document.body.style.background = '#060606';
+document.querySelectorAll('.score').forEach(el=> el.style.color = '#ff8800');
+document.querySelector('.teamA').style.borderColor = '#00ff85';  
+document.querySelector('.teamB').style.borderColor = '#b100ff';  
+    
+    
+  }
+}
+window.setTheme = setTheme;
+window.reloadOnce = ()=> location.reload();
+</script>
+</body>
+  </html>
