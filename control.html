@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>HoopLive — Control (No Team Name)</title>
+<style>   /* สีพื้นๆ */
+  :root{
+    --bg:#fffaf3; --panel:#ff6600; --text:#111;
+    --accentA:#ffb26b; --accentB:#0077ff;
+  }
+  
+   /* layout+ปุ่ม+กล่องคะแนน */
+  body{font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial; background:var(--bg); color:var(--text); margin:0; padding:18px;}
+  
+  h1{margin:0 0 12px;font-size:20px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  
+  .panel{background:var(--panel);padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,.06);margin-bottom:12px}
+  
+  button{padding:8px 12px;border-radius:8px;border:0;background:#333;color:#fff;cursor:pointer}
+  
+  .accentA{background:var(--accentA)}
+  .accentB{background:var(--accentB)}
+  
+  input,select{padding:8px;border-radius:8px;border:1px solid #ddd}
+  
+  .scores{display:flex;gap:12px;justify-content:center}
+  
+  .scoreCard{width:220px;padding:12px;border-radius:10px;text-align:center;background:#fafafa}
+  
+  .big{font-size:44px;font-weight:700}
+  
+  .meta{color:#666;font-size:13px;margin-top:6px}
+  
+  .note{font-size:13px;color:#444;margin-top:6px}
+  
+</style>
+</head>
+<body>
+  
+  <h1>🏀 HoopLive — Control</h1>
+  
+  <div class="panel">
+    <div class="row" style="margin-top:10px">
+      <label>Game length (min)</label>
+      <input id="gameMinutes" type="number" min="1" value="10" style="width:80px"/>
+      <label style="margin-left:12px">Shot default (s)</label>
+      <select id="shotDefault"><option>24</option><option>14</option><option>12</option></select>
+    </div>
+    <div class="note">ตั้งค่าก่อนเริ่ม — Start จะใช้ค่าตอนนี้</div>
+  </div>
+
+        <!-- ฝั่งA -->
+  
+  <div class="scores panel">
+    <div class="scoreCard">
+      <div style="color:#666">HOME</div>
+      <div id="scoreA" class="big">0</div>
+      <div style="margin-top:8px">
+        <button onclick="changeScore('A',1)">+1</button>
+        <button onclick="changeScore('A',2)">+2</button>
+        <button onclick="changeScore('A',3)">+3</button>
+      </div>
+      
+      
+      <div class="meta">Fouls: <span id="foulA">0</span> • TO: <span id="toA">3</span></div>
+      <div style="margin-top:8px">
+        <button onclick="addFoul('A')">Foul +1</button>
+        <button onclick="useTO('A')">Timeout</button>
+      </div>
+    </div>
+    
+         <!-- ฝั่งB -->
+    <div class="scoreCard">
+      <div style="color:#666">GUEST</div>
+      <div id="scoreB" class="big">0</div>
+      
+      <div style="margin-top:8px">
+        <button onclick="changeScore('B',1)">+1</button>
+        
+        <button onclick="changeScore('B',2)">+2</button>
+        
+        <button onclick="changeScore('B',3)">+3</button>
+      </div>
+      
+      <div class="meta">Fouls: <span id="foulB">0</span> • TO: <span id="toB">3</span></div>
+      
+      <div style="margin-top:8px">
+        <button onclick="addFoul('B')">Foul +1</button>
+        
+        <button onclick="useTO('B')">Timeout</button>
+        
+      </div>
+    </div>
+  </div>
+
+    <!-- นาฬิกา -->
+  <div class="panel">
+    <div class="row" style="align-items:center">
+      <div>
+        <div>Game Clock: <div id="gameClock" class="big">10:00</div></div>
+        <div style="margin-top:8px">
+          <button id="startStopBtn" onclick="toggleGame()" class="accentA">Start / Stop</button>
+          <button onclick="resetGame()">Reset Game</button>
+          <button onclick="nextPeriod()">Next Q</button>
+        </div>
+      </div>
+
+      <div style="margin-left:24px">
+        <div>Shot Clock: <div id="shotClock" class="big" style="font-size:30px">24</div></div>
+        <div style="margin-top:8px">
+          <button onclick="toggleShot()" class="accentB">Start / Stop Shot</button>
+          <button onclick="resetShot()">Reset Shot</button>
+        </div>
+        </div>
+      </div>  
+    <div id="status" class="meta">status: ready</div>
+  </div>
+  
+  <!-- Buzzer(ยังใช้ไม่ได้จ้า) + ปุ่มreset -->
+  <div style="text-align:center;margin-top:8px">
+    <audio id="buzzer-sound" src="https://actions.google.com/sounds/v1/alarms/buzzer.ogg"></audio>
+    <button id="buzzerBtn" style="background:#ff6b6b;color:#fff;border-radius:8px;padding:8px 12px;margin-right:8px">🔊 Buzzer</button>
+    <button id="resetAllBtn" style="background:#ffd166;color:#111;border-radius:8px;padding:8px 12px">♻️ Reset All</button>
+  </div>
+
+<script type="module">
+  /* เชื่อมFirebaseจ่ะ  */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+import { getDatabase, ref, set, update, onValue, runTransaction } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-database.js";
+/* CONFIG */
+const firebaseConfig = {
+  apiKey: "AIzaSyDAeKv-cemaxAtrwUVtDOHLFLPV9maK-qw",
+  authDomain: "hooplive-9c413.firebaseapp.com",
+  databaseURL: "https://hooplive-9c413-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "hooplive-9c413",
+  storageBucket: "hooplive-9c413.firebasestorage.app",
+  messagingSenderId: "640934960664",
+  appId: "1:640934960664:web:be7a84c3894aa1c90fed6d",
+  measurementId: "G-ENY1Q023Y7"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const gameRef = ref(db, "game");
+
+ //ค่าเริ่มต้น
+let state = {
+  scoreA:0, scoreB:0,
+  foulA:0, foulB:0,
+  toA:3, toB:3,
+  secondsLeft:600, shotLeft:24,
+  running:false, shotRunning:false,
+  period:1
+};
+
+//แปลงวินาที
+function fmt(sec){
+  const m=Math.floor(sec/60), s=Math.floor(sec%60);
+  return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+}
+
+ //ดึงข้อมูลจากfirebase
+onValue(gameRef, snap=>{
+  const d = snap.val();
+  if(!d) set(gameRef, state);
+  else { state = {...state, ...d}; updateUI(); }
+});
+
+ //อัปเดตค่า
+function updateUI(){
+  scoreA.textContent = state.scoreA;
+  scoreB.textContent = state.scoreB;
+  foulA.textContent = state.foulA;
+  foulB.textContent = state.foulB;
+  toA.textContent = state.toA;
+  toB.textContent = state.toB;
+  gameClock.textContent = fmt(state.secondsLeft);
+  shotClock.textContent = Math.floor(state.shotLeft);
+  status.textContent = `Q${state.period} | running:${state.running}`;
+}
+
+
+ //ปรับคะแนนทีม
+window.changeScore = async (team, pts)=>{
+  const key = team==='A'?'scoreA':'scoreB';
+  await runTransaction(ref(db,`game/${key}`),v=>(v||0)+pts);
+  const sd = parseInt(shotDefault.value)||24;
+  await update(gameRef,{shotLeft:sd,shotRunning:false});
+};
+
+ //ปุ่มฟาว
+window.addFoul = async (team)=>{
+  const key = team==='A'?'foulA':'foulB';
+  await runTransaction(ref(db,`game/${key}`),v=>(v||0)+1);
+};
+
+ //ปุ่มTO
+window.useTO = async (team)=>{
+  const key = team==='A'?'toA':'toB';
+  await runTransaction(ref(db,`game/${key}`),v=>Math.max(0,(v||3)-1));
+};
+
+//ตัวจับเวลา
+let tick;
+function loop(){
+  if(!state.running && !state.shotRunning){clearInterval(tick);tick=null;return;}
+  state.secondsLeft = Math.max(0,state.secondsLeft-(state.running?0.3:0));
+  state.shotLeft = Math.max(0,state.shotLeft-(state.shotRunning?0.3:0));
+  update(gameRef,{secondsLeft:state.secondsLeft,shotLeft:state.shotLeft});
+}
+
+//นาฬิกาเหม
+window.toggleGame=()=>{
+  state.running=!state.running;
+  if(state.running&&!tick) tick=setInterval(loop,300);
+  update(gameRef,{running:state.running});
+};
+
+//นาฬิกายิข
+window.toggleShot=()=>{
+  state.shotRunning=!state.shotRunning;
+  if(state.shotRunning&&!tick) tick=setInterval(loop,300);
+  update(gameRef,{shotRunning:state.shotRunning});
+};
+
+//ปุ่มรีเซ็ต
+window.resetGame=async()=>{
+  const mins=parseInt(gameMinutes.value)||10;
+  const sd=parseInt(shotDefault.value)||24;
+  state={...state,scoreA:0,scoreB:0,foulA:0,foulB:0,toA:3,toB:3,period:1,
+    secondsLeft:mins*60,shotLeft:sd,running:false,shotRunning:false};
+  await set(gameRef,state);
+};
+
+
+window.resetShot=async()=>{
+  const sd=parseInt(shotDefault.value)||24;
+  state.shotLeft=sd;state.shotRunning=false;
+  await update(gameRef,{shotLeft:sd,shotRunning:false});
+};
+
+
+window.nextPeriod=async()=>{
+  state.period++;state.running=false;state.shotRunning=false;
+  const mins=parseInt(gameMinutes.value)||10;
+  await update(gameRef,{period:state.period,secondsLeft:mins*60,running:false,shotRunning:false});
+};
+
+//ปุ่มรีเซ็ต
+document.getElementById("resetAllBtn").addEventListener("click",async()=>{
+  if(confirm("Reset ทุกอย่างจริงไหม?")){
+    const mins=parseInt(gameMinutes.value)||10;
+    const sd=parseInt(shotDefault.value)||24;
+    state={scoreA:0,scoreB:0,foulA:0,foulB:0,toA:3,toB:3,period:1,
+      secondsLeft:mins*60,shotLeft:sd,running:false,shotRunning:false};
+    await set(gameRef,state);
+  }
+});
+
+//เสียงbuzzer ทำไมไม่ติดหนอ
+document.getElementById("buzzerBtn").addEventListener("click",()=>buzzerSound.play());
+
+
+
+
+</script>
+</body>
+</html>
