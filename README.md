@@ -1,2 +1,5 @@
-# Scoreboard_basketball_control
-A project built to show a scoreboard basketball  , create two side controls side and display side
+# Scoreboard_basketball
++This project is a real-time basketball scoreboard web application
+-separates the control panel and display screen 
+-allowing score and game time to be updated live using Firebase Realtime Database
+-The project simulate a real scoreboard system use in basketball competition
